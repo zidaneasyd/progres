@@ -4,11 +4,17 @@ const clock =
 const dayBar =
   document.getElementById("dayBar");
 
+const dayPercent =
+  document.getElementById("dayPercent");
+
 const currentActivity =
   document.getElementById("currentActivity");
 
 const activityBar =
   document.getElementById("activityBar");
+
+const activityPercent =
+  document.getElementById("activityPercent");
 
 const activityStart =
   document.getElementById("activityStart");
@@ -19,6 +25,8 @@ const activityEnd =
 const scheduleList =
   document.getElementById("scheduleList");
 
+const scheduleCount =
+  document.getElementById("scheduleCount");
 
 
 /*
@@ -31,12 +39,14 @@ function timeToMinutes(time) {
   const [hour, minute] =
     time.split(":").map(Number);
 
-  return hour * 60 + minute;
+  return (
+    hour * 60 +
+    minute
+  );
 }
 
 
 function getWIBTime() {
-
   const now = new Date();
 
   const parts =
@@ -47,21 +57,17 @@ function getWIBTime() {
       minute: "2-digit",
       second: "2-digit",
 
-      hour12: false
+      hourCycle: "h23"
     }).formatToParts(now);
-
 
   const values = {};
 
-  parts.forEach(part => {
-
+  parts.forEach((part) => {
     if (part.type !== "literal") {
       values[part.type] =
         Number(part.value);
     }
-
   });
-
 
   return {
     hour: values.hour,
@@ -72,14 +78,31 @@ function getWIBTime() {
 
 
 function formatClock() {
-
-  const now = getWIBTime();
+  const now =
+    getWIBTime();
 
   return [
     String(now.hour).padStart(2, "0"),
     String(now.minute).padStart(2, "0"),
     String(now.second).padStart(2, "0")
   ].join(":");
+}
+
+
+function clamp(
+  value,
+  min = 0,
+  max = 100
+) {
+  return Math.min(
+    Math.max(value, min),
+    max
+  );
+}
+
+
+function formatPercent(value) {
+  return `${Math.round(clamp(value))}%`;
 }
 
 
@@ -91,37 +114,38 @@ function formatClock() {
  */
 
 function renderSchedule() {
-
   scheduleList.innerHTML = "";
 
+  scheduleCount.textContent =
+    `${schedule.length} aktivitas`;
 
-  schedule.forEach((item, index) => {
+  schedule.forEach(
+    (item, index) => {
 
-    const element =
-      document.createElement("div");
+      const element =
+        document.createElement("div");
 
+      element.className =
+        "item";
 
-    element.className = "item";
+      element.id =
+        `schedule-${index}`;
 
-    element.id =
-      `schedule-${index}`;
+      element.innerHTML = `
+        <div class="item-time">
+          ${item.start}
+        </div>
 
+        <div class="item-name">
+          ${item.name}
+        </div>
+      `;
 
-    element.innerHTML = `
-      <div class="item-time">
-        ${item.start}
-      </div>
-
-      <div class="item-name">
-        ${item.name}
-      </div>
-    `;
-
-
-    scheduleList.appendChild(element);
-
-  });
-
+      scheduleList.appendChild(
+        element
+      );
+    }
+  );
 }
 
 
@@ -132,7 +156,9 @@ function renderSchedule() {
  * ================================
  */
 
-function getCurrentActivity(currentMinutes) {
+function getCurrentActivity(
+  currentMinutes
+) {
 
   for (
     let i = 0;
@@ -140,64 +166,49 @@ function getCurrentActivity(currentMinutes) {
     i++
   ) {
 
-    const item = schedule[i];
+    const item =
+      schedule[i];
 
     const start =
-      timeToMinutes(item.start);
+      timeToMinutes(
+        item.start
+      );
 
     const end =
-      timeToMinutes(item.end);
+      timeToMinutes(
+        item.end
+      );
 
 
-    /*
-     * Normal activity
-     *
-     * contoh:
-     * 08:00 → 10:00
-     */
-
+    // Normal activity
     if (start <= end) {
 
       if (
         currentMinutes >= start &&
         currentMinutes < end
       ) {
-
         return {
           item,
           index: i
         };
-
       }
 
+      continue;
     }
 
 
-    /*
-     * Overnight activity
-     *
-     * contoh:
-     * 23:00 → 06:00
-     */
+    // Overnight activity
+    if (
+      currentMinutes >= start ||
+      currentMinutes < end
+    ) {
 
-    else {
-
-      if (
-        currentMinutes >= start ||
-        currentMinutes < end
-      ) {
-
-        return {
-          item,
-          index: i
-        };
-
-      }
-
+      return {
+        item,
+        index: i
+      };
     }
-
   }
-
 
   return null;
 }
@@ -206,7 +217,7 @@ function getCurrentActivity(currentMinutes) {
 
 /*
  * ================================
- * UPDATE ACTIVITY STATES
+ * UPDATE SCHEDULE STATES
  * ================================
  */
 
@@ -223,17 +234,20 @@ function updateScheduleStates(
           `schedule-${index}`
         );
 
+      if (!element) {
+        return;
+      }
 
       element.classList.remove(
-        "active"
-      );
-
-      element.classList.remove(
+        "active",
         "done"
       );
 
 
-      if (index === currentIndex) {
+      // Current
+      if (
+        index === currentIndex
+      ) {
 
         element.classList.add(
           "active"
@@ -243,24 +257,29 @@ function updateScheduleStates(
       }
 
 
+      const start =
+        timeToMinutes(
+          item.start
+        );
+
       const end =
-        timeToMinutes(item.end);
+        timeToMinutes(
+          item.end
+        );
 
 
+      // Normal finished activity
       if (
-        end <= currentMinutes &&
-        timeToMinutes(item.start) <= end
+        start <= end &&
+        currentMinutes >= end
       ) {
 
         element.classList.add(
           "done"
         );
-
       }
-
     }
   );
-
 }
 
 
@@ -276,25 +295,24 @@ function calculateActivityProgress(
   currentMinutes
 ) {
 
-  let start =
-    timeToMinutes(item.start);
+  const start =
+    timeToMinutes(
+      item.start
+    );
 
-  let end =
-    timeToMinutes(item.end);
+  const end =
+    timeToMinutes(
+      item.end
+    );
 
 
-  /*
-   * Overnight
-   */
-
+  // Overnight
   if (end < start) {
 
     const duration =
       (1440 - start) + end;
 
-
     let elapsed;
-
 
     if (
       currentMinutes >= start
@@ -308,32 +326,126 @@ function calculateActivityProgress(
       elapsed =
         (1440 - start) +
         currentMinutes;
-
     }
-
 
     return (
       elapsed / duration
     ) * 100;
-
   }
 
 
-  /*
-   * Normal
-   */
-
+  // Normal
   const duration =
     end - start;
+
+  if (duration <= 0) {
+    return 100;
+  }
 
   const elapsed =
     currentMinutes - start;
 
-
   return (
     elapsed / duration
   ) * 100;
+}
 
+
+
+/*
+ * ================================
+ * ANIMATE NUMBER
+ * ================================
+ */
+
+function updatePercentText(
+  element,
+  value
+) {
+
+  const nextValue =
+    Math.round(
+      clamp(value)
+    );
+
+  const currentValue =
+    Number(
+      element.dataset.value || 0
+    );
+
+  if (
+    nextValue === currentValue
+  ) {
+    element.textContent =
+      `${nextValue}%`;
+
+    return;
+  }
+
+  element.dataset.value =
+    String(nextValue);
+
+  element.animate(
+    [
+      {
+        transform:
+          "translateY(3px)",
+        opacity: 0.55
+      },
+      {
+        transform:
+          "translateY(0)",
+        opacity: 1
+      }
+    ],
+    {
+      duration: 180,
+      easing:
+        "cubic-bezier(.22,1,.36,1)"
+    }
+  );
+
+  element.textContent =
+    `${nextValue}%`;
+}
+
+
+
+/*
+ * ================================
+ * SET PROGRESS
+ * ================================
+ */
+
+function setProgress(
+  element,
+  percent
+) {
+
+  const safePercent =
+    clamp(percent);
+
+  element.style.width =
+    `${safePercent}%`;
+
+  const progressBar =
+    element.parentElement;
+
+  if (
+    progressBar &&
+    progressBar.getAttribute("role") ===
+      "progressbar"
+  ) {
+
+    progressBar.setAttribute(
+      "aria-valuenow",
+      String(
+        Math.round(
+          safePercent
+        )
+      )
+    );
+  }
 }
 
 
@@ -357,7 +469,7 @@ function update() {
 
 
   /*
-   * Clock
+   * CLOCK
    */
 
   clock.textContent =
@@ -365,7 +477,7 @@ function update() {
 
 
   /*
-   * 24 hour progress
+   * DAY PROGRESS
    */
 
   const dayProgress =
@@ -373,13 +485,19 @@ function update() {
       currentMinutes / 1440
     ) * 100;
 
+  setProgress(
+    dayBar,
+    dayProgress
+  );
 
-  dayBar.style.width =
-    `${dayProgress}%`;
+  updatePercentText(
+    dayPercent,
+    dayProgress
+  );
 
 
   /*
-   * Current activity
+   * CURRENT ACTIVITY
    */
 
   const current =
@@ -389,7 +507,7 @@ function update() {
 
 
   /*
-   * Tidak ada aktivitas
+   * NO ACTIVITY
    */
 
   if (!current) {
@@ -397,15 +515,21 @@ function update() {
     currentActivity.textContent =
       "Tidak ada aktivitas";
 
-    activityBar.style.width =
-      "0%";
+    setProgress(
+      activityBar,
+      0
+    );
+
+    updatePercentText(
+      activityPercent,
+      0
+    );
 
     activityStart.textContent =
       "--:--";
 
     activityEnd.textContent =
       "--:--";
-
 
     updateScheduleStates(
       currentMinutes,
@@ -417,7 +541,7 @@ function update() {
 
 
   /*
-   * Ada aktivitas
+   * ACTIVE ACTIVITY
    */
 
   const item =
@@ -427,10 +551,8 @@ function update() {
   currentActivity.textContent =
     item.name;
 
-
   activityStart.textContent =
     item.start;
-
 
   activityEnd.textContent =
     item.end;
@@ -443,25 +565,28 @@ function update() {
     );
 
 
-  activityBar.style.width =
-    `${Math.min(
-      Math.max(progress, 0),
-      100
-    )}%`;
+  setProgress(
+    activityBar,
+    progress
+  );
+
+  updatePercentText(
+    activityPercent,
+    progress
+  );
 
 
   updateScheduleStates(
     currentMinutes,
     current.index
   );
-
 }
 
 
 
 /*
  * ================================
- * START APP
+ * START
  * ================================
  */
 
