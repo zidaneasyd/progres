@@ -124,12 +124,14 @@ select {
   border-radius: inherit;
 
   background:
-    linear-gradient(
-      90deg,
-      #ffffff 0%,
-      #d4d4d8 50%,
-      #ffffff 100%
-    );
+  linear-gradient(
+    90deg,
+    #ffffff 0%,
+    #fff5dc 70%,
+    #f2d5a0 85%,
+    #e7b35a 100%
+  );
+
 
   box-shadow:
     0 0 18px rgba(255, 255, 255, 0.12);
@@ -140,12 +142,13 @@ select {
 
 #activityBar {
   background:
-    linear-gradient(
-      90deg,
-      #ffffff 0%,
-      #e4e4e7 50%,
-      #ffffff 100%
-    );
+  linear-gradient(
+    90deg,
+    #ffffff 0%,
+    #fff5dc 70%,
+    #f2d5a0 85%,
+    #e7b35a 100%
+  );
 }
 
 .progress-shine {
