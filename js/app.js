@@ -29,15 +29,64 @@ const scheduleCount =
   document.getElementById("scheduleCount");
 
 
+
+/*
+ * ================================
+ * CONSTANT
+ * ================================
+ */
+
+const WIB_OFFSET_MS =
+  7 * 60 * 60 * 1000;
+
+const DAY_MS =
+  24 * 60 * 60 * 1000;
+
+
+
+/*
+ * ================================
+ * STATE
+ * ================================
+ */
+
+let lastSecond = -1;
+
+let lastActivityIndex = -1;
+
+let lastDayPercent = -1;
+
+let lastActivityPercent = -1;
+
+let displayedDayProgress = 0;
+
+let displayedActivityProgress = 0;
+
+let targetDayProgress = 0;
+
+let targetActivityProgress = 0;
+
+
+
 /*
  * ================================
  * TIME UTILITIES
  * ================================
  */
 
+
+/*
+ * "09:30" -> 570
+ */
+
 function timeToMinutes(time) {
-  const [hour, minute] =
-    time.split(":").map(Number);
+
+  const [
+    hour,
+    minute
+  ] = time
+    .split(":")
+    .map(Number);
 
   return (
     hour * 60 +
@@ -46,63 +95,136 @@ function timeToMinutes(time) {
 }
 
 
+
+/*
+ * Get current WIB time
+ *
+ * Menggunakan timestamp langsung
+ * supaya animation frame tidak perlu
+ * menjalankan Intl setiap frame.
+ */
+
+function getWIBSecondsOfDay() {
+
+  const now =
+    Date.now();
+
+  const wibMs =
+    now + WIB_OFFSET_MS;
+
+  const dayMs =
+    (
+      (
+        wibMs % DAY_MS
+      ) +
+      DAY_MS
+    ) % DAY_MS;
+
+  return dayMs / 1000;
+}
+
+
+
+/*
+ * Get WIB hour/minute/second
+ */
+
 function getWIBTime() {
-  const now = new Date();
 
-  const parts =
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Jakarta",
+  const totalSeconds =
+    Math.floor(
+      getWIBSecondsOfDay()
+    );
 
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
 
-      hourCycle: "h23"
-    }).formatToParts(now);
+  const hour =
+    Math.floor(
+      totalSeconds / 3600
+    );
 
-  const values = {};
 
-  parts.forEach((part) => {
-    if (part.type !== "literal") {
-      values[part.type] =
-        Number(part.value);
-    }
-  });
+  const minute =
+    Math.floor(
+      (
+        totalSeconds % 3600
+      ) / 60
+    );
+
+
+  const second =
+    totalSeconds % 60;
+
 
   return {
-    hour: values.hour,
-    minute: values.minute,
-    second: values.second
+    hour,
+    minute,
+    second
   };
 }
 
 
+
+/*
+ * Get current WIB time
+ * dalam menit dengan desimal.
+ *
+ * Contoh:
+ *
+ * 09:30:00 = 570
+ * 09:30:30 = 570.5
+ * 09:30:45 = 570.75
+ */
+
+function getCurrentMinutes() {
+
+  return (
+    getWIBSecondsOfDay() / 60
+  );
+}
+
+
+
+/*
+ * Format clock
+ */
+
 function formatClock() {
+
   const now =
     getWIBTime();
 
+
   return [
-    String(now.hour).padStart(2, "0"),
-    String(now.minute).padStart(2, "0"),
-    String(now.second).padStart(2, "0")
+    String(now.hour)
+      .padStart(2, "0"),
+
+    String(now.minute)
+      .padStart(2, "0"),
+
+    String(now.second)
+      .padStart(2, "0")
   ].join(":");
 }
 
+
+
+/*
+ * Clamp value
+ */
 
 function clamp(
   value,
   min = 0,
   max = 100
 ) {
+
   return Math.min(
-    Math.max(value, min),
+    Math.max(
+      value,
+      min
+    ),
     max
   );
-}
-
-
-function formatPercent(value) {
-  return `${Math.round(clamp(value))}%`;
 }
 
 
@@ -114,22 +236,29 @@ function formatPercent(value) {
  */
 
 function renderSchedule() {
+
   scheduleList.innerHTML = "";
 
   scheduleCount.textContent =
     `${schedule.length} aktivitas`;
 
+
   schedule.forEach(
     (item, index) => {
 
       const element =
-        document.createElement("div");
+        document.createElement(
+          "div"
+        );
+
 
       element.className =
         "item";
 
+
       element.id =
         `schedule-${index}`;
+
 
       element.innerHTML = `
         <div class="item-time">
@@ -140,6 +269,7 @@ function renderSchedule() {
           ${item.name}
         </div>
       `;
+
 
       scheduleList.appendChild(
         element
@@ -169,10 +299,12 @@ function getCurrentActivity(
     const item =
       schedule[i];
 
+
     const start =
       timeToMinutes(
         item.start
       );
+
 
     const end =
       timeToMinutes(
@@ -180,24 +312,35 @@ function getCurrentActivity(
       );
 
 
-    // Normal activity
-    if (start <= end) {
+    /*
+     * Normal activity
+     */
+
+    if (
+      start <= end
+    ) {
 
       if (
         currentMinutes >= start &&
         currentMinutes < end
       ) {
+
         return {
           item,
           index: i
         };
       }
 
+
       continue;
     }
 
 
-    // Overnight activity
+
+    /*
+     * Overnight activity
+     */
+
     if (
       currentMinutes >= start ||
       currentMinutes < end
@@ -210,76 +353,8 @@ function getCurrentActivity(
     }
   }
 
+
   return null;
-}
-
-
-
-/*
- * ================================
- * UPDATE SCHEDULE STATES
- * ================================
- */
-
-function updateScheduleStates(
-  currentMinutes,
-  currentIndex
-) {
-
-  schedule.forEach(
-    (item, index) => {
-
-      const element =
-        document.getElementById(
-          `schedule-${index}`
-        );
-
-      if (!element) {
-        return;
-      }
-
-      element.classList.remove(
-        "active",
-        "done"
-      );
-
-
-      // Current
-      if (
-        index === currentIndex
-      ) {
-
-        element.classList.add(
-          "active"
-        );
-
-        return;
-      }
-
-
-      const start =
-        timeToMinutes(
-          item.start
-        );
-
-      const end =
-        timeToMinutes(
-          item.end
-        );
-
-
-      // Normal finished activity
-      if (
-        start <= end &&
-        currentMinutes >= end
-      ) {
-
-        element.classList.add(
-          "done"
-        );
-      }
-    }
-  );
 }
 
 
@@ -300,19 +375,29 @@ function calculateActivityProgress(
       item.start
     );
 
+
   const end =
     timeToMinutes(
       item.end
     );
 
 
-  // Overnight
-  if (end < start) {
+  /*
+   * Overnight activity
+   */
+
+  if (
+    end < start
+  ) {
 
     const duration =
-      (1440 - start) + end;
+      (
+        1440 - start
+      ) + end;
+
 
     let elapsed;
+
 
     if (
       currentMinutes >= start
@@ -324,96 +409,53 @@ function calculateActivityProgress(
     } else {
 
       elapsed =
-        (1440 - start) +
-        currentMinutes;
+        (
+          1440 - start
+        ) + currentMinutes;
     }
 
-    return (
-      elapsed / duration
-    ) * 100;
+
+    return clamp(
+      (
+        elapsed / duration
+      ) * 100
+    );
   }
 
 
-  // Normal
+
+  /*
+   * Normal activity
+   */
+
   const duration =
     end - start;
 
-  if (duration <= 0) {
+
+  if (
+    duration <= 0
+  ) {
+
     return 100;
   }
+
 
   const elapsed =
     currentMinutes - start;
 
-  return (
-    elapsed / duration
-  ) * 100;
-}
 
-
-
-/*
- * ================================
- * ANIMATE NUMBER
- * ================================
- */
-
-function updatePercentText(
-  element,
-  value
-) {
-
-  const nextValue =
-    Math.round(
-      clamp(value)
-    );
-
-  const currentValue =
-    Number(
-      element.dataset.value || 0
-    );
-
-  if (
-    nextValue === currentValue
-  ) {
-    element.textContent =
-      `${nextValue}%`;
-
-    return;
-  }
-
-  element.dataset.value =
-    String(nextValue);
-
-  element.animate(
-    [
-      {
-        transform:
-          "translateY(3px)",
-        opacity: 0.55
-      },
-      {
-        transform:
-          "translateY(0)",
-        opacity: 1
-      }
-    ],
-    {
-      duration: 180,
-      easing:
-        "cubic-bezier(.22,1,.36,1)"
-    }
+  return clamp(
+    (
+      elapsed / duration
+    ) * 100
   );
-
-  element.textContent =
-    `${nextValue}%`;
 }
 
 
 
 /*
  * ================================
- * SET PROGRESS
+ * PROGRESS BAR
  * ================================
  */
 
@@ -422,28 +464,28 @@ function setProgress(
   percent
 ) {
 
-  const safePercent =
+  const value =
     clamp(percent);
 
+
   element.style.width =
-    `${safePercent}%`;
+    `${value}%`;
+
 
   const progressBar =
     element.parentElement;
 
+
   if (
     progressBar &&
-    progressBar.getAttribute("role") ===
-      "progressbar"
+    progressBar.getAttribute(
+      "role"
+    ) === "progressbar"
   ) {
 
     progressBar.setAttribute(
       "aria-valuenow",
-      String(
-        Math.round(
-          safePercent
-        )
-      )
+      value.toFixed(2)
     );
   }
 }
@@ -452,62 +494,172 @@ function setProgress(
 
 /*
  * ================================
- * MAIN UPDATE
+ * PERCENT TEXT
  * ================================
  */
 
-function update() {
+function updatePercentText(
+  element,
+  value
+) {
 
-  const now =
-    getWIBTime();
-
-
-  const currentMinutes =
-    now.hour * 60 +
-    now.minute +
-    now.second / 60;
+  const formatted =
+    clamp(value)
+      .toFixed(2);
 
 
-  /*
-   * CLOCK
-   */
-
-  clock.textContent =
-    formatClock();
+  const text =
+    `${formatted}%`;
 
 
   /*
-   * DAY PROGRESS
+   * Jangan update DOM kalau
+   * nilainya memang belum berubah.
    */
 
-  const dayProgress =
-    (
-      currentMinutes / 1440
-    ) * 100;
+  if (
+    element.textContent === text
+  ) {
 
-  setProgress(
-    dayBar,
-    dayProgress
+    return;
+  }
+
+
+  element.textContent =
+    text;
+}
+
+
+
+/*
+ * ================================
+ * SCHEDULE STATE
+ * ================================
+ */
+
+function updateScheduleStates(
+  currentMinutes,
+  currentIndex
+) {
+
+  /*
+   * Kalau activity belum berubah,
+   * tidak perlu render ulang.
+   */
+
+  if (
+    currentIndex ===
+    lastActivityIndex
+  ) {
+
+    return;
+  }
+
+
+  schedule.forEach(
+    (item, index) => {
+
+      const element =
+        document.getElementById(
+          `schedule-${index}`
+        );
+
+
+      if (!element) {
+        return;
+      }
+
+
+      element.classList.remove(
+        "active",
+        "done"
+      );
+
+
+      /*
+       * Active
+       */
+
+      if (
+        index === currentIndex
+      ) {
+
+        element.classList.add(
+          "active"
+        );
+
+        return;
+      }
+
+
+      /*
+       * Done
+       */
+
+      const start =
+        timeToMinutes(
+          item.start
+        );
+
+
+      const end =
+        timeToMinutes(
+          item.end
+        );
+
+
+      if (
+        start <= end &&
+        currentMinutes >= end
+      ) {
+
+        element.classList.add(
+          "done"
+        );
+      }
+    }
   );
 
-  updatePercentText(
-    dayPercent,
-    dayProgress
-  );
+
+  lastActivityIndex =
+    currentIndex;
+}
+
+
+
+/*
+ * ================================
+ * CURRENT ACTIVITY
+ * ================================
+ */
+
+function updateCurrentActivity(
+  current,
+  currentMinutes
+) {
+
+  const currentIndex =
+    current
+      ? current.index
+      : -1;
 
 
   /*
-   * CURRENT ACTIVITY
+   * Tidak ada perubahan activity.
    */
 
-  const current =
-    getCurrentActivity(
-      currentMinutes
-    );
+  if (
+    currentIndex ===
+    lastActivityIndex
+  ) {
+
+    return;
+  }
+
 
 
   /*
-   * NO ACTIVITY
+   * Tidak ada aktivitas
    */
 
   if (!current) {
@@ -515,33 +667,44 @@ function update() {
     currentActivity.textContent =
       "Tidak ada aktivitas";
 
+
+    activityStart.textContent =
+      "--:--";
+
+
+    activityEnd.textContent =
+      "--:--";
+
+
     setProgress(
       activityBar,
       0
     );
+
 
     updatePercentText(
       activityPercent,
       0
     );
 
-    activityStart.textContent =
-      "--:--";
-
-    activityEnd.textContent =
-      "--:--";
 
     updateScheduleStates(
       currentMinutes,
       -1
     );
 
+
+    lastActivityPercent =
+      0;
+
+
     return;
   }
 
 
+
   /*
-   * ACTIVE ACTIVITY
+   * Ada aktivitas
    */
 
   const item =
@@ -551,34 +714,18 @@ function update() {
   currentActivity.textContent =
     item.name;
 
+
   activityStart.textContent =
     item.start;
+
 
   activityEnd.textContent =
     item.end;
 
 
-  const progress =
-    calculateActivityProgress(
-      item,
-      currentMinutes
-    );
-
-
-  setProgress(
-    activityBar,
-    progress
-  );
-
-  updatePercentText(
-    activityPercent,
-    progress
-  );
-
-
   updateScheduleStates(
     currentMinutes,
-    current.index
+    currentIndex
   );
 }
 
@@ -586,16 +733,281 @@ function update() {
 
 /*
  * ================================
- * START
+ * SMOOTH PROGRESS
+ * ================================
+ *
+ * Fungsi ini berjalan setiap
+ * animation frame.
+ *
+ * Progress dihitung berdasarkan
+ * waktu sebenarnya, bukan berdasarkan
+ * jumlah frame.
+ */
+
+function updateSmoothProgress() {
+
+  const currentMinutes =
+    getCurrentMinutes();
+
+
+
+  /*
+   * ================================
+   * DAY PROGRESS
+   * ================================
+   */
+
+  targetDayProgress =
+    (
+      currentMinutes / 1440
+    ) * 100;
+
+
+
+  /*
+   * ================================
+   * CURRENT ACTIVITY
+   * ================================
+   */
+
+  const current =
+    getCurrentActivity(
+      currentMinutes
+    );
+
+
+
+  /*
+   * ================================
+   * ACTIVITY PROGRESS
+   * ================================
+   */
+
+  if (current) {
+
+    targetActivityProgress =
+      calculateActivityProgress(
+        current.item,
+        currentMinutes
+      );
+
+  } else {
+
+    targetActivityProgress =
+      0;
+  }
+
+
+
+  /*
+   * ================================
+   * DISPLAY PROGRESS
+   * ================================
+   *
+   * Tidak lagi pakai interpolation
+   * yang bisa terasa berhenti.
+   *
+   * Nilai bar mengikuti waktu
+   * secara langsung.
+   */
+
+  displayedDayProgress =
+    targetDayProgress;
+
+
+  displayedActivityProgress =
+    targetActivityProgress;
+
+
+
+  /*
+   * ================================
+   * DRAW DAY BAR
+   * ================================
+   */
+
+  setProgress(
+    dayBar,
+    displayedDayProgress
+  );
+
+
+  updatePercentText(
+    dayPercent,
+    displayedDayProgress
+  );
+
+
+
+  /*
+   * ================================
+   * DRAW ACTIVITY BAR
+   * ================================
+   */
+
+  setProgress(
+    activityBar,
+    displayedActivityProgress
+  );
+
+
+  updatePercentText(
+    activityPercent,
+    displayedActivityProgress
+  );
+}
+
+
+
+/*
+ * ================================
+ * LIGHT UI UPDATE
+ * ================================
+ *
+ * Jalan setiap 250ms.
+ *
+ * Digunakan untuk:
+ *
+ * - clock
+ * - current activity
+ * - schedule state
+ */
+
+function updateUI() {
+
+  const now =
+    getWIBTime();
+
+
+  /*
+   * ================================
+   * CLOCK
+   * ================================
+   */
+
+  if (
+    now.second !==
+    lastSecond
+  ) {
+
+    clock.textContent =
+      formatClock();
+
+
+    lastSecond =
+      now.second;
+  }
+
+
+
+  /*
+   * ================================
+   * CURRENT MINUTES
+   * ================================
+   */
+
+  const currentMinutes =
+    (
+      now.hour * 60
+    ) +
+    now.minute +
+    (
+      now.second / 60
+    );
+
+
+
+  /*
+   * ================================
+   * CURRENT ACTIVITY
+   * ================================
+   */
+
+  const current =
+    getCurrentActivity(
+      currentMinutes
+    );
+
+
+  const currentIndex =
+    current
+      ? current.index
+      : -1;
+
+
+  /*
+   * Activity berubah
+   */
+
+  if (
+    currentIndex !==
+    lastActivityIndex
+  ) {
+
+    updateCurrentActivity(
+      current,
+      currentMinutes
+    );
+  }
+
+
+
+  /*
+   * ================================
+   * SCHEDULE STATE
+   * ================================
+   */
+
+  updateScheduleStates(
+    currentMinutes,
+    currentIndex
+  );
+}
+
+
+
+/*
+ * ================================
+ * ANIMATION LOOP
+ * ================================
+ */
+
+function animationLoop() {
+
+  updateSmoothProgress();
+
+
+  requestAnimationFrame(
+    animationLoop
+  );
+}
+
+
+
+/*
+ * ================================
+ * START APPLICATION
  * ================================
  */
 
 renderSchedule();
 
-update();
+updateUI();
 
+animationLoop();
+
+
+
+/*
+ * ================================
+ * UI UPDATE TIMER
+ * ================================
+ *
+ * Clock dan schedule tidak perlu
+ * di-update setiap frame.
+ */
 
 setInterval(
-  update,
-  1000
+  updateUI,
+  250
 );
